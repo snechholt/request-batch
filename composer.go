@@ -15,10 +15,13 @@ type Handler struct {
 }
 
 type request struct {
-	Path string `json:"path"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
 }
 
 type response struct {
+	Method   string              `json:"method"`
+	Path     string              `json:"path"`
 	Status   int                 `json:"status"`
 	Headers  map[string][]string `json:"headers"`
 	Body     string              `json:"body"`
@@ -37,6 +40,12 @@ func (c *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if err = json.Unmarshal(b, &req); err != nil {
 		w.WriteHeader(400)
 		return
+	}
+	for _, req := range req {
+		if req.Method == "" || req.Path == "" {
+			w.WriteHeader(400)
+			return
+		}
 	}
 	r.Body.Close()
 	r.Body = nil
@@ -61,7 +70,6 @@ func (c *Handler) getResponses(r *http.Request, req []*request) []*response {
 	wg.Add(len(req))
 	var m sync.Mutex
 	for i := range req {
-		// TODO: copy request completely and run in goroutine
 		/* go */ func(i int) {
 			req := req[i]
 			t0 := time.Now()
@@ -71,14 +79,17 @@ func (c *Handler) getResponses(r *http.Request, req []*request) []*response {
 			if len(parts) > 1 {
 				r.URL.RawQuery = parts[1]
 			}
+			r.Method = req.Method
 			c.NormalHandler.ServeHTTP(&w, r)
 			dur := time.Now().Sub(t0)
-			m.Lock()
 			var body string
 			if w.buf != nil && w.buf.Len() > 0 {
 				body = w.buf.String()
 			}
+			m.Lock()
 			res[i] = &response{
+				Method:   req.Method,
+				Path:     req.Path,
 				Status:   w.status,
 				Headers:  w.header,
 				Body:     body,

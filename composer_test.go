@@ -44,10 +44,10 @@ func TestGetResponses(t *testing.T) {
 		t.Fatalf("Error creating request: %v", err)
 	}
 	req := []*request{
-		{Path: "/api/a"},
-		{Path: "/wasd1"},
-		{Path: "/api/b"},
-		{Path: "/wasd2"},
+		{Method: "GET", Path: "/api/a"},
+		{Method: "GET", Path: "/wasd1"},
+		{Method: "GET", Path: "/api/b"},
+		{Method: "GET", Path: "/wasd2"},
 	}
 	res := handler.getResponses(r, req)
 
