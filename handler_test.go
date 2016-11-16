@@ -3,6 +3,7 @@ package batch
 import (
 	"bytes"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -15,10 +16,12 @@ type testResponse struct {
 }
 
 type testHandler struct {
-	routes map[string]*testResponse
+	routes   map[string]*testResponse
+	requests []*http.Request
 }
 
 func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.requests = append(h.requests, r)
 	if resp, ok := h.routes[r.Method+":"+r.URL.Path]; ok {
 		for key, value := range resp.Headers {
 			w.Header().Set(key, value)
@@ -189,17 +192,54 @@ func TestGetResponses(t *testing.T) {
 		{Method: "PUT", Path: "/2", Status: 404, Body: ""},
 	}
 
-	if nGot, nWant := len(res), len(want); nGot != nWant {
-		t.Errorf("Wrong number of responses. Got %d, want %d", nGot, nWant)
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("Wrong response.\nGot %v\nWant %v", res, want)
+	}
+}
+
+func TestGetResponse(t *testing.T) {
+	th := &testHandler{
+		routes: map[string]*testResponse{
+			"GET:/a": &testResponse{200, "A", map[string]string{"H1": "h1"}},
+		},
+	}
+	handler := &Handler{
+		NormalHandler: th,
+	}
+	const rBody = "bod bod"
+	r, err := http.NewRequest("POST", "https://localhost/api/batch", strings.NewReader(rBody))
+	if err != nil {
+		t.Fatalf("Error creating request: %v", err)
+	}
+	req := &request{Method: "GET", Path: "/a?b=1#c"}
+	res := handler.getResponse(r, req)
+
+	// Check that we got the right response
+	{
+		want := &response{
+			Method: "GET",
+			Path:   "/a?b=1#c",
+			Status: 200,
+			Body:   "A",
+			Headers: map[string][]string{
+				"H1": []string{"h1"},
+			},
+		}
+		if !reflect.DeepEqual(res, want) {
+			t.Errorf("Wrong response returned\nGot  %v\nWant %v", res, want)
+		}
+	}
+
+	// Check that we sent the correct request to the inner handler
+	if len(th.requests) != 1 {
+		t.Errorf("Wrong number of batch requests sent. Got %d, want 1", len(th.requests))
 	} else {
-		for i, got := range res {
-			want := want[i]
-			if want.Status != got.Status {
-				t.Errorf("Wrong status for response to %s. Got %d, want %d", req[i].Path, got.Status, want.Status)
-			}
-			if want.Body != got.Body {
-				t.Errorf("Wrong body for response to %s. Got '%s', want '%s'", req[i].Path, got.Body, want.Body)
-			}
+		batchRequest := th.requests[0]
+		if batchRequest.Method != "GET" {
+			t.Errorf("Wrong batch request method. Got %s, want GET", batchRequest.Method)
+		}
+		if got, want := batchRequest.URL.String(), "https://localhost/a?b=1#c"; got != want {
+			t.Errorf("Wrong URL for batch request.\nGot  %v\nwant %v", got, want)
 		}
 	}
 }

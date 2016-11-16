@@ -68,35 +68,37 @@ func (c *Handler) getResponses(r *http.Request, req []*request) []*response {
 	var wg sync.WaitGroup
 	wg.Add(len(req))
 	var m sync.Mutex
-	for i := range req {
-		/* go */ func(i int) {
-			req := req[i]
-			var w rw
-			parts := strings.Split(req.Path, "?")
-			r.URL.Path = parts[0]
-			if len(parts) > 1 {
-				r.URL.RawQuery = parts[1]
-			}
-			r.Method = req.Method
-			c.NormalHandler.ServeHTTP(&w, r)
-			var body string
-			if w.buf != nil && w.buf.Len() > 0 {
-				body = w.buf.String()
-			}
+	for i, req := range req {
+		/* go */ func(req *request, i int) {
+			batchResponse := c.getResponse(r, req)
 			m.Lock()
-			res[i] = &response{
-				Method:  req.Method,
-				Path:    req.Path,
-				Status:  w.status,
-				Headers: w.header,
-				Body:    body,
-			}
+			res[i] = batchResponse
 			m.Unlock()
 			wg.Done()
-		}(i)
+		}(req, i)
 	}
 	wg.Wait()
 	return res
+}
+
+func (h *Handler) getResponse(r *http.Request, req *request) *response {
+	batchReq, err := createHTTPRequest(r, req)
+	if err != nil {
+		panic(err)
+	}
+	var w rw
+	h.NormalHandler.ServeHTTP(&w, batchReq)
+	var body string
+	if w.buf != nil && w.buf.Len() > 0 {
+		body = w.buf.String()
+	}
+	return &response{
+		Method:  req.Method,
+		Path:    req.Path,
+		Status:  w.status,
+		Headers: w.header,
+		Body:    body,
+	}
 }
 
 type rw struct {
@@ -122,4 +124,11 @@ func (w *rw) Write(p []byte) (int, error) {
 
 func (w *rw) WriteHeader(status int) {
 	w.status = status
+}
+
+func createHTTPRequest(mainRequest *http.Request, r *request) (*http.Request, error) {
+	req, err := http.NewRequest(r.Method, r.Path, strings.NewReader(""))
+	req.URL.Scheme = mainRequest.URL.Scheme
+	req.URL.Host = mainRequest.URL.Host
+	return req, err
 }
