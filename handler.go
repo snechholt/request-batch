@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Handler struct {
@@ -21,12 +20,11 @@ type request struct {
 }
 
 type response struct {
-	Method   string              `json:"method"`
-	Path     string              `json:"path"`
-	Status   int                 `json:"status"`
-	Headers  map[string][]string `json:"headers"`
-	Body     string              `json:"body"`
-	Duration string              `json:"duration"`
+	Method  string              `json:"method"`
+	Path    string              `json:"path"`
+	Status  int                 `json:"status"`
+	Headers map[string][]string `json:"headers"`
+	Body    string              `json:"body"`
 }
 
 func (c *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +71,6 @@ func (c *Handler) getResponses(r *http.Request, req []*request) []*response {
 	for i := range req {
 		/* go */ func(i int) {
 			req := req[i]
-			t0 := time.Now()
 			var w rw
 			parts := strings.Split(req.Path, "?")
 			r.URL.Path = parts[0]
@@ -82,19 +79,17 @@ func (c *Handler) getResponses(r *http.Request, req []*request) []*response {
 			}
 			r.Method = req.Method
 			c.NormalHandler.ServeHTTP(&w, r)
-			dur := time.Now().Sub(t0)
 			var body string
 			if w.buf != nil && w.buf.Len() > 0 {
 				body = w.buf.String()
 			}
 			m.Lock()
 			res[i] = &response{
-				Method:   req.Method,
-				Path:     req.Path,
-				Status:   w.status,
-				Headers:  w.header,
-				Body:     body,
-				Duration: dur.String(),
+				Method:  req.Method,
+				Path:    req.Path,
+				Status:  w.status,
+				Headers: w.header,
+				Body:    body,
 			}
 			m.Unlock()
 			wg.Done()

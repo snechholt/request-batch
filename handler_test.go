@@ -140,8 +140,7 @@ func TestServeHTTP(t *testing.T) {
 				"headers": {
 					"H1": ["hA"]
 				},
-				"body": "A",
-				"duration": "0s"
+				"body": "A"
 			},
 			{
 				"method": "PUT",
@@ -150,8 +149,7 @@ func TestServeHTTP(t *testing.T) {
 				"headers": {
 					"H1": ["hB"]
 				},
-				"body": "B",
-				"duration": "0s"
+				"body": "B"
 			}
 		]`
 		want = regexp.MustCompile(`[\n\t ]*`).ReplaceAllString(want, "")
