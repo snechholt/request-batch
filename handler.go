@@ -20,11 +20,16 @@ type request struct {
 }
 
 type response struct {
-	Method  string              `json:"method"`
-	Path    string              `json:"path"`
-	Status  int                 `json:"status"`
-	Headers map[string][]string `json:"headers"`
-	Body    string              `json:"body"`
+	Method  string   `json:"method"`
+	Path    string   `json:"path"`
+	Status  int      `json:"status"`
+	Headers []header `json:"headers,omitempty"`
+	Body    string   `json:"body"`
+}
+
+type header struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 func (c *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -92,11 +97,21 @@ func (h *Handler) getResponse(r *http.Request, req *request) *response {
 	if w.buf != nil && w.buf.Len() > 0 {
 		body = w.buf.String()
 	}
+	var headers []header
+	if len(w.header) > 0 {
+		headers = make([]header, 0, len(w.header))
+	}
+	for key, vals := range w.header {
+		for _, val := range vals {
+			header := header{Key: key, Value: val}
+			headers = append(headers, header)
+		}
+	}
 	return &response{
 		Method:  req.Method,
 		Path:    req.Path,
 		Status:  w.status,
-		Headers: w.header,
+		Headers: headers,
 		Body:    body,
 	}
 }

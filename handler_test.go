@@ -78,9 +78,7 @@ func TestServeHTTP(t *testing.T) {
 		} else {
 			for key, want := range want {
 				got := got[key]
-				if len(got) != 1 {
-					t.Errorf("Wrong headers returned for non-batch request. Want %v, got %v", want, got)
-				} else if got[0] != want {
+				if len(got) != 1 || got[0] != want {
 					t.Errorf("Wrong headers returned for non-batch request. Want %v, got %v", want, got)
 					break
 				}
@@ -140,24 +138,24 @@ func TestServeHTTP(t *testing.T) {
 				"method": "GET",
 				"path": "/a",
 				"status": 200,
-				"headers": {
-					"H1": ["hA"]
-				},
+				"headers": [
+					{ "key": "H1", "value": "hA" }
+				],
 				"body": "A"
 			},
 			{
 				"method": "PUT",
 				"path": "/b",
 				"status": 201,
-				"headers": {
-					"H1": ["hB"]
-				},
+				"headers": [
+					{ "key": "H1", "value": "hB" }
+				],
 				"body": "B"
 			}
 		]`
 		want = regexp.MustCompile(`[\n\t ]*`).ReplaceAllString(want, "")
 		if got := rw.BodyStr(); want != got {
-			t.Errorf("ServeHTTP for batch request wrote wrong body. Want %s, got %s", want, got)
+			t.Errorf("ServeHTTP for batch request wrote wrong body.\nWant %s\nGot  %s", want, got)
 		}
 	}
 }
@@ -221,8 +219,8 @@ func TestGetResponse(t *testing.T) {
 			Path:   "/a?b=1#c",
 			Status: 200,
 			Body:   "A",
-			Headers: map[string][]string{
-				"H1": []string{"h1"},
+			Headers: []header{
+				{Key: "H1", Value: "h1"},
 			},
 		}
 		if !reflect.DeepEqual(res, want) {
