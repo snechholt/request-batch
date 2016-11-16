@@ -2,6 +2,7 @@ package batch
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -204,12 +205,19 @@ func TestGetResponse(t *testing.T) {
 	handler := &Handler{
 		NormalHandler: th,
 	}
-	const rBody = "bod bod"
-	r, err := http.NewRequest("POST", "https://localhost/api/batch", strings.NewReader(rBody))
+	r, err := http.NewRequest("POST", "https://localhost/api/batch", &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("Error creating request: %v", err)
 	}
-	req := &request{Method: "GET", Path: "/a?b=1#c"}
+	req := &request{
+		Method: "GET",
+		Path:   "/a?b=1#c",
+		Headers: []header{
+			header{Key: "K1", Value: "v1"},
+			header{Key: "K2", Value: "v2"},
+			header{Key: "K1", Value: "v3"}, // note: same key as the first header element
+		},
+		Body: "req bod"}
 	res := handler.getResponse(r, req)
 
 	// Check that we got the right response
@@ -238,6 +246,23 @@ func TestGetResponse(t *testing.T) {
 		}
 		if got, want := batchRequest.URL.String(), "https://localhost/a?b=1#c"; got != want {
 			t.Errorf("Wrong URL for batch request.\nGot  %v\nwant %v", got, want)
+		}
+		wantHeader := map[string][]string{"K1": []string{"v1", "v3"}, "K2": []string{"v2"}}
+		if len(batchRequest.Header) != len(wantHeader) {
+			t.Errorf("Wrong Header for batch request\nGot  %v\nWant %v", batchRequest.Header, wantHeader)
+		} else {
+			for key, want := range wantHeader {
+				got, ok := batchRequest.Header[key]
+				if !ok || !reflect.DeepEqual(got, want) {
+					t.Errorf("Wrong Header for batch request\nGot  %v\nWant %v", batchRequest.Header, wantHeader)
+					break
+				}
+			}
+		}
+		if b, err := ioutil.ReadAll(batchRequest.Body); err != nil {
+			t.Errorf("Error reading batch request body: %v", err)
+		} else if got, want := string(b), "req bod"; got != want {
+			t.Errorf("Wrong request body for batch request\nGot  %v\nWant %v", got, want)
 		}
 	}
 }

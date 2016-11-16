@@ -15,8 +15,10 @@ type Handler struct {
 }
 
 type request struct {
-	Method string `json:"method"`
-	Path   string `json:"path"`
+	Method  string   `json:"method"`
+	Path    string   `json:"path"`
+	Body    string   `json:"body"`
+	Headers []header `json:"headers"`
 }
 
 type response struct {
@@ -145,5 +147,9 @@ func createHTTPRequest(mainRequest *http.Request, r *request) (*http.Request, er
 	req, err := http.NewRequest(r.Method, r.Path, strings.NewReader(""))
 	req.URL.Scheme = mainRequest.URL.Scheme
 	req.URL.Host = mainRequest.URL.Host
+	req.Body = ioutil.NopCloser(strings.NewReader(r.Body))
+	for _, header := range r.Headers {
+		req.Header.Add(header.Key, header.Value)
+	}
 	return req, err
 }
