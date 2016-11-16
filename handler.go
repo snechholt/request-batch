@@ -12,6 +12,7 @@ import (
 
 type Handler struct {
 	NormalHandler http.Handler
+	MatchRequest  func(r *http.Request) bool
 }
 
 type request struct {
@@ -29,7 +30,7 @@ type response struct {
 }
 
 func (c *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" || r.URL.Path != "/api/batch" {
+	if !c.MatchRequest(r) {
 		c.NormalHandler.ServeHTTP(w, r)
 		return
 	}
